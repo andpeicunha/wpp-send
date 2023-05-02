@@ -1,14 +1,8 @@
-import express, { response } from "express";
+import express from "express";
+const fs = require("fs");
+const path = require("path");
 
-const qrcode = require("qrcode-terminal");
-const { Client, LocalAuth, RemoteAuth } = require("whatsapp-web.js");
-
-const { MongoStore } = require("wwebjs-mongo");
-const mongoose = require("mongoose");
-
-const store = new MongoStore({ mongoose: mongoose });
-const uri =
-  "mongodb://andrepeixoto:1aZfQP1b0OUhY7lm@ac-6qvwjxy-shard-00-00.ebtfujp.mongodb.net:27017,ac-6qvwjxy-shard-00-01.ebtfujp.mongodb.net:27017,ac-6qvwjxy-shard-00-02.ebtfujp.mongodb.net:27017/?ssl=true&replicaSet=atlas-vk92p0-shard-0&authSource=admin&retryWrites=true&w=majority";
+const venom = require("venom-bot");
 
 const app = express();
 const port = 3000;
@@ -17,96 +11,69 @@ app.get("/", (request, response) => {
   return response.send("Server Online 🎉");
 });
 
-app.get("/authMongo", (request, response) => {
-  mongoose.connect(uri).then(() => {
-    console.log("🎲 Conectado ao MongoDB");
-    const client = new Client({
-      authStrategy: new RemoteAuth({
-        store: store,
-        clientId: "chefJoice",
-        backupSyncIntervalMs: 300000,
-      }),
-    });
-    client.initialize();
-
-    client.on("qr", (qr: any) => {
-      console.log("👨‍💻 Gerando QRCode");
-      qrcode.generate(qr, { small: true });
-    });
-
-    client.on("authenticated", () => {
-      console.log("🔐 AUTENTICADO");
-    });
-
-    client.on("ready", () => {
-      console.log("🤳 PRONTO PARA ENVIAR!");
+app.get("/venom", (request, response) => {
+  venom
+    .create({
+      session: "joice",
+      multidevice: true,
+    })
+    .then((client: any) => {
+      response.send("Pronto para enviar!");
       response.status(200).end();
+    })
+    .catch((erro: any) => {
+      console.log(erro);
+      response.send(`Erro ao conectar... + ${erro}`);
+      response.status(500).end();
     });
-  });
 });
 
-app.get("/authLocal", (request, response) => {
-  console.log("Autenticação WhatsApp 🔐");
-
-  const client = new Client({
-    authStrategy: new LocalAuth({ clientId: "chefJoice" }),
-  });
-
-  client.on("qr", (qr: any) => {
-    qrcode.generate(qr, { small: true });
-  });
-
-  client.on("ready", () => {
-    console.log("Client is ready!");
-  });
-
-  client.on("authenticated", () => {
-    console.log("Autenticado!");
-    response.send("Autenticado!");
-  });
-  client.initialize();
-});
-
-app.get("/valida", (request, response) => {
-  mongoose.connect(uri).then(() => {
-    const client = new Client({
-      authStrategy: new RemoteAuth({
-        store: store,
-        clientId: "chefJoice",
-        backupSyncIntervalMs: 300000,
-      }),
-    });
-
-    client.initialize();
-
-    client.on("remote_session_saved", async () => {
-      console.log("VALIDANDO SEÇÃO");
-      await store.sessionExists({ session: "RemoteAuth-chefJoice" });
-    });
-  });
-});
-
-app.get("/sender/:num", (request, response) => {
+app.get("/sender/:num", async (request, response) => {
   const num = request.params.num;
   const phoneNumber = `55${num}@c.us`;
-  const msg = "Oi ✌ /n/n Aqui é o Robo da Chef Joice";
+  const msg = "Oi ✌ \nAqui é o Robo da Chef Joice"; // \n line break
 
-  const client = new Client({
-    authStrategy: new LocalAuth({ clientId: "chefJoice" }),
-  });
-  client.initialize();
+  const imageBuffer = fs.readFileSync(path.join(__dirname, "img.jpg"));
+  const imagemConvertBase64 = imageBuffer.toString("base64");
+  const imageBase64 = `data:image/jpg;base64,${imagemConvertBase64}`;
 
-  client.on("authenticated", () => {
-    console.log("AUTENTICADO");
-  });
+  venom
+    .create({
+      session: "joice",
+      multidevice: true,
+    })
+    .then((client: any) => start(client))
+    .catch((erro: any) => {
+      console.log(erro);
+    });
 
-  client.on("ready", async () => {
-    console.log(`ENVIANDO PARA...${phoneNumber}`);
-    client.sendMessage(phoneNumber, msg);
-    response.send(`Mensagem: ${msg} enviada para ${num}!`);
-  });
+  async function start(client: any) {
+    console.log("ENVIANDO MENSAGENS");
+    console.log(client.getProfilePicFromServer(phoneNumber));
+
+    await client
+      .sendText(phoneNumber, msg)
+      .then((result: any) => {
+        console.log("Result: ", result); //return object success
+        response.send(`Mensagem Enviada: ${phoneNumber}: ${msg}`);
+      })
+      .catch((erro: any) => {
+        console.error("Error when sending: ", erro); //return object error
+      });
+
+    await client
+      .sendImageFromBase64(phoneNumber, imageBase64, "image")
+      .then((result: any) => {
+        console.log("Result: ", result); //return object success
+        response.status(200).end();
+      })
+      .catch((erro: any) => {
+        console.error("Error when sending: ", erro); //return object error
+        response.status(500).end();
+      });
+  }
 });
 
 app.listen(port, () => {
-  console.log(`HTTP Server running! ${port}`);
+  console.log(`SERVER RUNNING: https://localhost:${port}`);
 });
