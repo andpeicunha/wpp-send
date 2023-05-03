@@ -28,14 +28,11 @@ app.get("/venom", (request, response) => {
     });
 });
 
-app.get("/sender/:num", async (request, response) => {
+app.get("/sender/:num/:msg", async (request, response) => {
   const num = request.params.num;
+  const msg = request.params.msg;
   const phoneNumber = `55${num}@c.us`;
-  const msg = "Oi ✌ \nAqui é o Robo da Chef Joice"; // \n line break
-
-  const imageBuffer = fs.readFileSync(path.join(__dirname, "img.jpg"));
-  const imagemConvertBase64 = imageBuffer.toString("base64");
-  const imageBase64 = `data:image/jpg;base64,${imagemConvertBase64}`;
+  console.log(msg);
 
   venom
     .create({
@@ -48,29 +45,30 @@ app.get("/sender/:num", async (request, response) => {
     });
 
   async function start(client: any) {
-    console.log("ENVIANDO MENSAGENS");
-    console.log(client.getProfilePicFromServer(phoneNumber));
-
     await client
       .sendText(phoneNumber, msg)
       .then((result: any) => {
-        console.log("Result: ", result); //return object success
-        response.send(`Mensagem Enviada: ${phoneNumber}: ${msg}`);
-      })
-      .catch((erro: any) => {
-        console.error("Error when sending: ", erro); //return object error
-      });
-
-    await client
-      .sendImageFromBase64(phoneNumber, imageBase64, "image")
-      .then((result: any) => {
-        console.log("Result: ", result); //return object success
+        console.log(`Mensagem Enviada para: ${num} | ${msg}`);
         response.status(200).end();
       })
       .catch((erro: any) => {
         console.error("Error when sending: ", erro); //return object error
-        response.status(500).end();
       });
+
+    const imageBuffer = fs.readFileSync(path.join(__dirname, "img.jpg"));
+    const imagemConvertBase64 = imageBuffer.toString("base64");
+    const imageBase64 = `data:image/jpg;base64,${imagemConvertBase64}`;
+
+    // await client
+    //   .sendImageFromBase64(phoneNumber, imageBase64, "image")
+    //   .then((result: any) => {
+    //     console.log("Result: ", result); //return object success
+    //     response.status(200).end();
+    //   })
+    //   .catch((erro: any) => {
+    //     console.error("Error when sending: ", erro); //return object error
+    //     response.status(500).end();
+    //   });
   }
 });
 
